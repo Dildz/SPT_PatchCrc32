@@ -78,6 +78,20 @@ This project consists of two main components:
 
 ## Installation
 
+The easiest route is a prebuilt zip from the [Releases page](https://github.com/Dildz/SPT_PatchCrc32/releases).
+Extract it into your game folder so you end up with:
+
+```
+BepInEx/plugins/s8_SPT_PatchCRC32/SPT_PatchCRC32.Plugin.dll
+BepInEx/plugins/s8_SPT_PatchCRC32/libcrc32_pclmulqdq.dll
+```
+
+**Both files are required.** The plugin loads the native DLL from its own folder by that exact
+filename. Without it, it logs that the accelerator was not found and falls back to SPT's managed
+CRC32, so it installs cleanly and does nothing.
+
+To build it yourself instead:
+
 1. Build the project using `Package.ps1`
 2. Extract the generated `.7z` archive to your SPTarkov root directory
 3. The plugin will be automatically loaded by BepInEx
