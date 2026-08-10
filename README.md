@@ -8,7 +8,12 @@ A high-performance CRC32 patch for SPTarkov that utilizes hardware-accelerated P
 > **The C# plugin compiles against SPT 4.1.2 references with no source changes.** The method it
 > patches, `SPT.Custom.Utils.Crc32.HashToUInt32`, is unchanged between SPT 4.1.1 and 4.1.2, and the
 > `com.SPT.custom` plugin GUID it depends on is unchanged from 4.0, so the declared `4.0.0` minimum
-> is still satisfied. It has **not yet been verified at runtime on a 4.1 server**.
+> is still satisfied.
+>
+> **Verified at runtime on a live SPT 4.1.2 stack**: the native accelerator loads and bundle
+> validation runs through the PCLMULQDQ path. Note the released native DLL is cross-compiled with
+> mingw-w64 GCC rather than upstream's clang, so it is not a bit-identical rebuild of upstream's
+> binary.
 >
 > Note that the six `spt-*` client assemblies do differ between SPT 4.1.1 and 4.1.2, so build against
 > references taken from the SPT release you intend to run.

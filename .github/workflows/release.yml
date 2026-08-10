@@ -168,11 +168,19 @@ jobs:
 
             ## Testing status
 
-            **Pre-release.** Built by CI and verified only to the extent that the native DLL is a 64-bit Windows binary with the filename the plugin expects. It has **never been loaded by the game**: no server, no headless, no player client, no raid.
+            Verified on a live **SPT 4.1.2** stack with a Fika headless client. The native accelerator loaded and was picked up by SPT_LoadBundleEvenFaster, which then validated every bundle through it:
 
-            Note the native DLL is cross-compiled with **mingw-w64 GCC**, where upstream built theirs with clang 19. Same source, different compiler, so it is not a bit-identical rebuild of upstream's binary and comes out a different size. The CRC32 results are defined by the algorithm rather than the toolchain, so output should be identical, but performance has not been measured against a clang build.
+            ```
+            [Performance] Hooked into 'com.s8.sptpatchcrc32' native accelerator successfully!
+            ValidateBundlesStreamingAsync: Starting parallel bundle validation for 25 bundles using Native PCLMULQDQ
+            ValidateBundlesStreamingAsync: Validation completed. Valid: 25/25
+            ```
 
-            Because this patches checksum validation during bundle loading, a fault shows up as bundles failing to validate or a load that never finishes. Test somewhere you can afford to break.
+            25/25 valid means the native CRC32 results matched what SPT expected, so the mingw build computes the same checksums.
+
+            Note the native DLL is cross-compiled with **mingw-w64 GCC**, where upstream built theirs with clang 19. Same source, different compiler, so it is not a bit-identical rebuild of upstream's binary and comes out a different size. Performance has not been measured against a clang build.
+
+            **Not yet exercised across a full raid**, and tested on one machine only.
 
             ## Credits
 
