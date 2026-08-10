@@ -170,6 +170,8 @@ jobs:
 
             **Pre-release.** Built by CI and verified only to the extent that the native DLL is a 64-bit Windows binary with the filename the plugin expects. It has **never been loaded by the game**: no server, no headless, no player client, no raid.
 
+            Note the native DLL is cross-compiled with **mingw-w64 GCC**, where upstream built theirs with clang 19. Same source, different compiler, so it is not a bit-identical rebuild of upstream's binary and comes out a different size. The CRC32 results are defined by the algorithm rather than the toolchain, so output should be identical, but performance has not been measured against a clang build.
+
             Because this patches checksum validation during bundle loading, a fault shows up as bundles failing to validate or a load that never finishes. Test somewhere you can afford to break.
 
             ## Credits
