@@ -13,7 +13,7 @@ using SPT.Custom.Utils;
 namespace SPT_PatchCRC32.Plugin
 {
     // first string below is your plugin's GUID, it MUST be unique to any other mod. Read more about it in BepInEx docs. Be sure to update it if you copy this project.
-    [BepInPlugin("com.s8.sptpatchcrc32", "s8", "1.0.0")]
+    [BepInPlugin("com.s8.sptpatchcrc32", "s8", "1.0.1")]
     [BepInDependency("com.SPT.custom", "4.0.0")]
 
     public class Plugin : BaseUnityPlugin

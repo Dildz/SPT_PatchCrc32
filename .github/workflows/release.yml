@@ -140,7 +140,7 @@ jobs:
           # !!! UPDATE THIS BODY BEFORE TAGGING A NEW RELEASE !!!
           # It is baked in verbatim, so a stale body ships the previous version's notes.
           body: |
-            Fork of [s8ga/SPT_PatchCrc32](https://github.com/s8ga/SPT_PatchCrc32), built against **SPT 4.1.2**.
+            Fork of [s8ga/SPT_PatchCrc32](https://github.com/s8ga/SPT_PatchCrc32), built against **SPT 4.1.2**. Plugin version **1.0.1**, which is upstream's 1.0.0 code rebuilt for 4.1.2; the version moved only because this repo inherited upstream's `v1.0.0` tag.
 
             Replaces SPT's managed CRC32 with a hardware-accelerated PCLMULQDQ implementation, which speeds up bundle checksum validation at load.
 
