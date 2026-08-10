@@ -1,0 +1,177 @@
+# Builds both halves of the plugin and publishes a release with an installable zip.
+#
+# Two artifacts have to end up side by side:
+#   SPT_PatchCRC32.Plugin.dll   - the C# BepInEx plugin (managed)
+#   libcrc32_pclmulqdq.dll      - the native CRC32 accelerator (Windows x86_64)
+#
+# The native half is cross-compiled with mingw-w64 rather than MSVC ON PURPOSE: the
+# plugin does LoadLibrary("libcrc32_pclmulqdq.dll"), and the `lib` prefix is mingw's
+# output naming. MSVC would produce crc32_pclmulqdq.dll and the plugin would silently
+# fall back to the managed implementation, which is the whole thing this mod replaces.
+#
+# The C# half needs reference assemblies that cannot live in a public repo (14 of the
+# ~20 are Escape From Tarkov's own DLLs), so they come from the private
+# Dildz/spt-client-refs via the REFS_TOKEN secret.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      spt_version:
+        description: "SPT version to build against (must exist under spt/ in spt-client-refs)"
+        required: true
+        default: "4.1.2"
+
+permissions:
+  contents: write
+
+env:
+  SPT_VERSION: ${{ inputs.spt_version || '4.1.2' }}
+  PLUGIN_DIR: s8_SPT_PatchCRC32
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install mingw-w64 and ninja
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mingw-w64 ninja-build
+
+      # Bypasses CMakePresets/toolchain-mingw-clang.cmake, which look for clang.exe on a
+      # Windows host. Same compiler family, cross-hosted.
+      - name: Build the native CRC32 DLL
+        run: |
+          set -euo pipefail
+          cmake -S crc32_dll -B crc32_dll/build -G Ninja \
+            -DCMAKE_SYSTEM_NAME=Windows \
+            -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
+            -DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPREFER_MINGW_LLVM_CLANG=OFF
+          cmake --build crc32_dll/build
+          find crc32_dll/build -name '*.dll' -print
+
+      - name: Verify the native DLL name and format
+        run: |
+          set -euo pipefail
+          dll=$(find crc32_dll/build -name 'libcrc32_pclmulqdq.dll' | head -1)
+          if [ -z "$dll" ]; then
+            echo "FATAL: libcrc32_pclmulqdq.dll not produced - the plugin loads it by that exact name" >&2
+            find crc32_dll/build -name '*.dll' >&2
+            exit 1
+          fi
+          file "$dll"
+          file "$dll" | grep -q "PE32+" || { echo "FATAL: not a 64-bit Windows DLL" >&2; exit 1; }
+          echo "NATIVE_DLL=$dll" >> "$GITHUB_ENV"
+
+      # Needs a fine-grained PAT with Contents: Read on Dildz/spt-client-refs,
+      # stored in THIS repo as the REFS_TOKEN secret (secrets are per-repo).
+      - name: Fetch reference assemblies
+        uses: actions/checkout@v4
+        with:
+          repository: Dildz/spt-client-refs
+          token: ${{ secrets.REFS_TOKEN }}
+          path: .refs
+
+      - name: Assemble References/Client
+        run: .refs/assemble-refs.sh "$SPT_VERSION" References/Client
+
+      - name: Build the C# plugin
+        run: dotnet build SPT_PatchCRC32.Plugin/SPT_PatchCRC32.Plugin.csproj -c Release
+
+      - name: Stage the installable layout
+        run: |
+          set -euo pipefail
+          stage="Package/BepInEx/plugins/${PLUGIN_DIR}"
+          mkdir -p "$stage"
+          cp SPT_PatchCRC32.Plugin/bin/Release/netstandard2.1/SPT_PatchCRC32.Plugin.dll "$stage/"
+          cp "$NATIVE_DLL" "$stage/"
+          find Package -type f | sort
+
+      # The C# build output sits next to a copy of every reference, including the game's
+      # 16MB Assembly-CSharp.dll. Publishing those would leak game files into a public
+      # release, so fail loudly rather than ship them.
+      - name: Guard against leaking reference assemblies
+        run: |
+          set -euo pipefail
+          unexpected=$(find Package -name '*.dll' \
+            ! -name 'SPT_PatchCRC32.Plugin.dll' \
+            ! -name 'libcrc32_pclmulqdq.dll' | wc -l)
+          if [ "$unexpected" -ne 0 ]; then
+            echo "FATAL: $unexpected unexpected DLL(s) staged - refusing to publish" >&2
+            find Package -name '*.dll' ! -name 'SPT_PatchCRC32.Plugin.dll' ! -name 'libcrc32_pclmulqdq.dll' >&2
+            exit 1
+          fi
+          echo "OK: only the plugin DLL and the native accelerator are staged"
+
+      - name: Create zip
+        run: |
+          set -euo pipefail
+          name="${PLUGIN_DIR}-${GITHUB_REF_NAME}-SPT${SPT_VERSION}.zip"
+          cd Package && zip -r -9 "../$name" BepInEx && cd ..
+          unzip -l "$name"
+          echo "ZIP_NAME=$name" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PLUGIN_DIR }}-${{ env.SPT_VERSION }}
+          path: ${{ env.ZIP_NAME }}
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_NAME }}
+          generate_release_notes: true
+          name: "SPT_PatchCRC32 ${{ github.ref_name }} (SPT ${{ env.SPT_VERSION }})"
+          prerelease: ${{ contains(github.ref_name, '-pre') || contains(github.ref_name, '-rc') }}
+          # !!! UPDATE THIS BODY BEFORE TAGGING A NEW RELEASE !!!
+          # It is baked in verbatim, so a stale body ships the previous version's notes.
+          body: |
+            Fork of [s8ga/SPT_PatchCrc32](https://github.com/s8ga/SPT_PatchCrc32), built against **SPT 4.1.2**.
+
+            Replaces SPT's managed CRC32 with a hardware-accelerated PCLMULQDQ implementation, which speeds up bundle checksum validation at load.
+
+            ## Install
+
+            Extract into your game folder so you end up with:
+
+            ```
+            BepInEx/plugins/s8_SPT_PatchCRC32/SPT_PatchCRC32.Plugin.dll
+            BepInEx/plugins/s8_SPT_PatchCRC32/libcrc32_pclmulqdq.dll
+            ```
+
+            **Both files are required.** The plugin loads the native DLL from its own folder by name; without it, it logs that the accelerator was not found and falls back to SPT's managed implementation, which defeats the point.
+
+            Pairs with [SPT_LoadBundleEvenFaster](https://github.com/Dildz/SPT_LoadBundleEvenFaster), which detects this plugin at runtime and uses it for parallel bundle validation. Neither requires the other.
+
+            ## What differs from upstream
+
+            **Nothing in the source.** The C# plugin compiles against SPT 4.1.2 references unchanged: the method it patches, `SPT.Custom.Utils.Crc32.HashToUInt32`, is the same in 4.1.1 and 4.1.2, and the `com.SPT.custom` dependency GUID is unchanged from 4.0. This release exists to provide a build made against 4.1.2 rather than 4.0.
+
+            ## Requirements
+
+            - **SPT 4.1.2**
+            - A CPU supporting SSE4.1 and PCLMULQDQ, which in practice means any Intel chip after 2010 or AMD after 2011.
+
+            ## Testing status
+
+            **Pre-release.** Built by CI and verified only to the extent that the native DLL is a 64-bit Windows binary with the filename the plugin expects. It has **never been loaded by the game**: no server, no headless, no player client, no raid.
+
+            Because this patches checksum validation during bundle loading, a fault shows up as bundles failing to validate or a load that never finishes. Test somewhere you can afford to break.
+
+            ## Credits
+
+            All original design and code by **s8ga**, MIT licensed. The CRC32 implementation derives from [zlib-ng](https://github.com/zlib-ng/zlib-ng) and Intel's original PCLMULQDQ algorithm. See the README for full attribution.
