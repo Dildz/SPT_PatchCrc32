@@ -1,6 +1,17 @@
-# SPT_PatchCRC32
+# SPT_PatchCRC32 (SPT 4.1 port)
 
 A high-performance CRC32 patch for SPTarkov that utilizes hardware-accelerated PCLMULQDQ instructions for faster checksum calculations.
+
+> **About this fork.** This is a fork of [s8ga/SPT_PatchCrc32](https://github.com/s8ga/SPT_PatchCrc32)
+> for **SPT 4.1.2**. All design and code is s8ga's.
+>
+> **The C# plugin compiles against SPT 4.1.2 references with no source changes.** The method it
+> patches, `SPT.Custom.Utils.Crc32.HashToUInt32`, is unchanged between SPT 4.1.1 and 4.1.2, and the
+> `com.SPT.custom` plugin GUID it depends on is unchanged from 4.0, so the declared `4.0.0` minimum
+> is still satisfied. It has **not yet been verified at runtime on a 4.1 server**.
+>
+> Note that the six `spt-*` client assemblies do differ between SPT 4.1.1 and 4.1.2, so build against
+> references taken from the SPT release you intend to run.
 
 ## Project Overview
 
@@ -8,7 +19,7 @@ A high-performance CRC32 patch for SPTarkov that utilizes hardware-accelerated P
 - **Plugin Version**: 1.0.0
 - **Assembly Version**: 1.7.0
 - **Target Framework**: .NET Standard 2.1
-- **SPT Dependency**: com.SPT.custom 4.0.0
+- **SPT Dependency**: com.SPT.custom, minimum 4.0.0 (satisfied by 4.1.2)
 
 ## Platform Requirements
 
