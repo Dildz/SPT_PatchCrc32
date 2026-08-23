@@ -1,3 +1,29 @@
+> # ⚠️ ARCHIVED: obsolete as of SPT 4.1.3
+>
+> **Do not use this on SPT 4.1.3 or later. The method it patches no longer exists.**
+>
+> This plugin hardware accelerates `SPT.Custom.Utils.Crc32.HashToUInt32` with PCLMULQDQ.
+> SPT 4.1.3 **removed `SPT.Custom.Utils.Crc32` entirely**, along with
+> `BundleManager.ShouldAcquire` and `BundleCrcCache`, which were its only callers.
+>
+> The bundle cache is now content addressed:
+>
+> ```csharp
+> // SPT 4.1.3, BundleManager.GetBundleFilePath
+> "SPT_Runtime/user/cache/bundles/" + bundle.Crc.ToString("X8") + "/" + bundle.FileName
+> ```
+>
+> The CRC comes from the server manifest and forms part of the path, so the client never
+> hashes a bundle at all. There is nothing left for this to accelerate.
+>
+> Because the patch target is resolved by reflection, on 4.1.3 this fails quietly rather than
+> throwing: the plugin loads, finds no method to patch, and does nothing. It is dead weight
+> rather than actively harmful, unlike its companion
+> [SPT_LoadBundleEvenFaster](https://github.com/Dildz/SPT_LoadBundleEvenFaster), which breaks
+> bundle loading outright on 4.1.3.
+>
+> The branch and tags are kept for reference against SPT 4.1.2 and earlier.
+
 # SPT_PatchCRC32 (SPT 4.1 port)
 
 A high-performance CRC32 patch for SPTarkov that utilizes hardware-accelerated PCLMULQDQ instructions for faster checksum calculations.
